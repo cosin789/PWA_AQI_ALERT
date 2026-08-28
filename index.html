@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบแจ้งเตือนคุณภาพอากาศ ม.มหิดล</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1976D2">
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f4f6f8;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .card {
+      background: #ffffff;
+      max-width: 400px;
+      width: 100%;
+      padding: 28px;
+      border-radius: 16px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+    .icon { font-size: 48px; margin-bottom: 12px; }
+    h1 { font-size: 20px; color: #1a1a1a; margin-bottom: 8px; }
+    p { font-size: 14px; color: #666; line-height: 1.5; margin-bottom: 20px; }
+    .btn {
+      background: #1976D2;
+      color: #ffffff;
+      border: none;
+      padding: 14px 20px;
+      font-size: 15px;
+      font-weight: 600;
+      border-radius: 10px;
+      cursor: pointer;
+      width: 100%;
+      transition: background 0.2s;
+    }
+    .btn:disabled { background: #9e9e9e; cursor: not-allowed; }
+    .btn:hover:not(:disabled) { background: #1565C0; }
+    #status-msg {
+      margin-top: 14px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .success { color: #2e7d32; }
+    .error { color: #d32f2f; }
+  </style>
+
+  <!-- โหลด Firebase SDK แบบ Compat Version -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
+</head>
+<body>
+
+  <div class="card">
+    <div class="icon">🌿</div>
+    <h1>รายงานสภาพอากาศ ม.มหิดล</h1>
+    <p>กดปุ่มด้านล่างเพื่อรับการแจ้งเตือนค่าฝุ่น PM2.5 และ AQI ประจำวันเด้งเข้าหน้าจอมือถืออัตโนมัติ</p>
+    <button class="btn" id="subscribeBtn">🔔 เปิดรับการแจ้งเตือน</button>
+    <div id="status-msg"></div>
+  </div>
+
+  <script>
+    // 1. นำค่า Firebase Config มาวางที่นี่
+    const firebaseConfig = {
+        apiKey: "AIzaSyBYh9A6rnlE-fk59R__ZxZT6AMfMwreIJc",
+        authDomain: "pwa-aqi-alert.firebaseapp.com",
+        projectId: "pwa-aqi-alert",
+        storageBucket: "pwa-aqi-alert.firebasestorage.app",
+        messagingSenderId: "G-J0LEYE4YFT",
+        appId: "1:351293220998:web:631e82ed1049c986d60907"
+    };
+
+    // 2. Key Pair (Public VAPID Key) จาก Firebase Console -> Cloud Messaging
+    const VAPID_KEY = "YOUR_PUBLIC_VAPID_KEY";
+
+    // 3. Web App URL จาก Google Apps Script (Deployment URL)
+    const GAS_WEBAPP_URL = "https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec";
+
+    firebase.initializeApp(firebaseConfig);
+    const messaging = firebase.messaging();
+
+    const subscribeBtn = document.getElementById('subscribeBtn');
+    const statusMsg = document.getElementById('status-msg');
+
+    subscribeBtn.addEventListener('click', async () => {
+      subscribeBtn.disabled = true;
+      statusMsg.className = '';
+      statusMsg.textContent = 'กำลังดำเนินการ...';
+
+      try {
+        // ขอสิทธิ์แจ้งเตือนจากผู้ใช้
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          statusMsg.className = 'error';
+          statusMsg.textContent = 'กรุณาอนุญาตสิทธิ์การแจ้งเตือนในเบราว์เซอร์';
+          subscribeBtn.disabled = false;
+          return;
+        }
+
+        // ลงทะเบียน Service Worker
+        const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
+
+        // ขอ Device Token จาก Firebase
+        const currentToken = await messaging.getToken({
+          vapidKey: VAPID_KEY,
+          serviceWorkerRegistration: registration
+        });
+
+        if (currentToken) {
+          // ส่ง Token ไปยัง Google Apps Script Web App
+          await fetch(GAS_WEBAPP_URL, {
+            method: 'POST',
+            mode: 'no-cors', // รองรับ Cross-origin กับ Google Apps Script
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: currentToken })
+          });
+
+          statusMsg.className = 'success';
+          statusMsg.textContent = '✅ ลงทะเบียนรับการแจ้งเตือนสำเร็จ!';
+          subscribeBtn.textContent = 'เปิดการแจ้งเตือนแล้ว';
+        } else {
+          throw new Error('ไม่สามารถสร้าง Registration Token ได้');
+        }
+
+      } catch (error) {
+        console.error('Registration Error:', error);
+        statusMsg.className = 'error';
+        statusMsg.textContent = 'เกิดข้อผิดพลาดในการลงทะเบียน กรุณาลองใหม่อีกครั้ง';
+        subscribeBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
