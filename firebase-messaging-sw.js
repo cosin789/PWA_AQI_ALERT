@@ -6,34 +6,51 @@ const firebaseConfig = {
   authDomain: "pwa-aqi-alert.firebaseapp.com",
   projectId: "pwa-aqi-alert",
   storageBucket: "pwa-aqi-alert.firebasestorage.app",
-  messagingSenderId: "351293220998", // แก้ไขเป็น Sender ID ตัวเลขจริง
+  messagingSenderId: "351293220998",
   appId: "1:351293220998:web:631e82ed1049c986d60907"
 };
 
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
+// รับข้อความจาก Firebase Background Handler
 messaging.onBackgroundMessage((payload) => {
-  const notificationTitle = payload.notification?.title || "🌿 รายงานคุณภาพอากาศ มหิดล";
-  const notificationOptions = {
-    body: payload.notification?.body || "มีการอัปเดตข้อมูลคุณภาพอากาศล่าสุด",
-    icon: './Icon_PWA.png', // เปลี่ยนเป็น Relative Path
-    badge: './icon-192.png', // เปลี่ยนเป็น Relative Path
+  const title = payload.notification?.title || payload.data?.title || "🌿 รายงานคุณภาพอากาศ มหิดล";
+  const options = {
+    body: payload.notification?.body || payload.data?.body || "อัปเดตข้อมูลคุณภาพอากาศล่าสุด",
+    icon: 'https://cosin789.github.io/PWA_AQI_ALERT/Icon_PWA.png',
+    badge: 'https://cosin789.github.io/PWA_AQI_ALERT/icon-192.png',
     data: {
-      url: payload.data?.url || './index.html'
+      url: payload.data?.url || 'https://cosin789.github.io/PWA_AQI_ALERT/'
     }
   };
 
-  self.registration.showNotification(notificationTitle, notificationOptions);
+  self.registration.showNotification(title, options);
+});
+
+// ดักจับ Push Event ระดับล่างเพื่อความเสถียร 100% บนมือถือ
+self.addEventListener('push', (event) => {
+  if (event.data) {
+    const data = event.data.json();
+    const title = data.notification?.title || "🌿 รายงานคุณภาพอากาศ มหิดล";
+    const options = {
+      body: data.notification?.body || "อัปเดตข้อมูลคุณภาพอากาศล่าสุด",
+      icon: 'https://cosin789.github.io/PWA_AQI_ALERT/Icon_PWA.png',
+      badge: 'https://cosin789.github.io/PWA_AQI_ALERT/icon-192.png',
+      data: {
+        url: data.data?.url || 'https://cosin789.github.io/PWA_AQI_ALERT/'
+      }
+    };
+    event.waitUntil(self.registration.showNotification(title, options));
+  }
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = event.notification.data?.url || './index.html';
+  const targetUrl = event.notification.data?.url || 'https://cosin789.github.io/PWA_AQI_ALERT/';
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      // หากมีแท็บเปิดอยู่แล้วให้โฟกัสแท็บเดิม ถ้าไม่มีให้เปิดแท็บใหม่
       for (let client of windowClients) {
         if (client.url === targetUrl && 'focus' in client) {
           return client.focus();
