@@ -14,13 +14,14 @@ firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
 // รับข้อความ Background จาก Firebase และใส่ tag ป้องกันการเด้งซ้อน
+// ใน firebase-messaging-sw.js
 messaging.onBackgroundMessage((payload) => {
   const title = payload.notification?.title || payload.data?.title || "🌿 รายงานคุณภาพอากาศ มหิดล";
   const options = {
     body: payload.notification?.body || payload.data?.body || "อัปเดตข้อมูลคุณภาพอากาศล่าสุด",
     icon: 'https://cosin789.github.io/PWA_AQI_ALERT/Icon_PWA.png',
     badge: 'https://cosin789.github.io/PWA_AQI_ALERT/icon-192.png',
-    tag: 'daily-aqi-alert',
+    tag: 'mahidol-aqi-daily', // 👈 ปรับให้ตรงกัน
     renotify: true,
     data: {
       url: payload.data?.url || 'https://cosin789.github.io/PWA_AQI_ALERT/'
