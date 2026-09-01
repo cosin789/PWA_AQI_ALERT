@@ -254,7 +254,50 @@
     const dots = document.querySelectorAll('.dot');
     let currentIndex = 0;
     const totalSlides = 2;
+// ฟังก์ชันล้างและลงทะเบียนใหม่แบบอัตโนมัติ
+    async function fixAndResubscribe() {
+      statusMsg.className = '';
+      statusMsg.textContent = 'กำลังซ่อมแซมและเชื่อมต่อระบบใหม่...';
 
+      try {
+        // 1. ยกเลิก Token เก่าใน Firebase
+        await messaging.deleteToken();
+
+        // 2. ล้าง Service Worker เก่าทั้งหมด
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (let registration of registrations) {
+          await registration.unregister();
+        }
+
+        // 3. ติดตั้ง Service Worker ใหม่และขอ Token สดใหม่
+        const newReg = await navigator.serviceWorker.register('./firebase-messaging-sw.js', { scope: './' });
+        await navigator.serviceWorker.ready;
+
+        const freshToken = await messaging.getToken({
+          vapidKey: VAPID_KEY,
+          serviceWorkerRegistration: newReg
+        });
+
+        if (freshToken) {
+          // ส่ง Token ใหม่ไปบันทึกทับใน Google Sheets
+          await fetch(GAS_WEBAPP_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              token: freshToken,
+              email: userEmailInput.value.trim() || "Re-subscribed User"
+            })
+          });
+
+          statusMsg.className = 'success';
+          statusMsg.textContent = '✅ ซ่อมแซมระบบสำเร็จ! เครื่องพร้อมรับการแจ้งเตือนแล้ว';
+        }
+      } catch (err) {
+        statusMsg.className = 'error';
+        statusMsg.textContent = 'กรุณาแตะไอคอนรูปกุญแจ/ตั้งค่าข้าง URL เพื่อกดอนุญาตแจ้งเตือน';
+      }
+    }
     function updateCarousel(index, smooth = true) {
       track.style.transition = smooth ? 'transform 0.35s ease-out' : 'none';
       currentIndex = (index + totalSlides) % totalSlides;
