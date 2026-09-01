@@ -13,36 +13,21 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-// รับข้อความจาก Firebase Background Handler
+// รับข้อความ Background จาก Firebase และใส่ tag ป้องกันการเด้งซ้อน
 messaging.onBackgroundMessage((payload) => {
   const title = payload.notification?.title || payload.data?.title || "🌿 รายงานคุณภาพอากาศ มหิดล";
   const options = {
     body: payload.notification?.body || payload.data?.body || "อัปเดตข้อมูลคุณภาพอากาศล่าสุด",
     icon: 'https://cosin789.github.io/PWA_AQI_ALERT/Icon_PWA.png',
     badge: 'https://cosin789.github.io/PWA_AQI_ALERT/icon-192.png',
+    tag: 'daily-aqi-alert',
+    renotify: true,
     data: {
       url: payload.data?.url || 'https://cosin789.github.io/PWA_AQI_ALERT/'
     }
   };
 
   self.registration.showNotification(title, options);
-});
-
-// ดักจับ Push Event ระดับล่างเพื่อความเสถียร 100% บนมือถือ
-self.addEventListener('push', (event) => {
-  if (event.data) {
-    const data = event.data.json();
-    const title = data.notification?.title || "🌿 รายงานคุณภาพอากาศ มหิดล";
-    const options = {
-      body: data.notification?.body || "อัปเดตข้อมูลคุณภาพอากาศล่าสุด",
-      icon: 'https://cosin789.github.io/PWA_AQI_ALERT/Icon_PWA.png',
-      badge: 'https://cosin789.github.io/PWA_AQI_ALERT/icon-192.png',
-      data: {
-        url: data.data?.url || 'https://cosin789.github.io/PWA_AQI_ALERT/'
-      }
-    };
-    event.waitUntil(self.registration.showNotification(title, options));
-  }
 });
 
 self.addEventListener('notificationclick', (event) => {

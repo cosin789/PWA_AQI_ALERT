@@ -2,108 +2,348 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ระบบแจ้งเตือนคุณภาพอากาศ ม.มหิดล</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ระบบรายงานและแจ้งเตือนคุณภาพอากาศ ม.มหิดล ศาลายา</title>
+  
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#1976D2">
+  <meta name="theme-color" content="#0288D1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="AirAlert">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
+  <!-- Chart.js สำหรับแสดงกราฟ -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
 
   <style>
+    :root {
+      --primary: #0288D1;
+      --primary-dark: #01579B;
+      --bg: #F0F4F8;
+      --card-bg: #FFFFFF;
+      --text-main: #1A202C;
+      --text-muted: #718096;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #f4f6f8;
+      background-color: var(--bg);
+      color: var(--text-main);
+      padding: 16px;
       display: flex;
       justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      padding: 16px;
     }
-    .card {
-      background: #ffffff;
-      max-width: 400px;
+
+    .container {
+      max-width: 680px;
       width: 100%;
-      padding: 28px;
-      border-radius: 16px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* Header */
+    .header-card {
+      background: linear-gradient(135deg, #0288D1 0%, #00ACC1 100%);
+      color: white;
+      border-radius: 18px;
+      padding: 18px;
+      text-align: center;
+      box-shadow: 0 4px 14px rgba(2, 136, 209, 0.2);
+    }
+    .header-card h1 { font-size: 19px; font-weight: 700; }
+    .header-card p { font-size: 12px; opacity: 0.9; margin-top: 2px; }
+
+    /* Live Summary Card */
+    .hero-card {
+      background: var(--card-bg);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
       text-align: center;
     }
-    .icon { font-size: 48px; margin-bottom: 12px; }
-    h1 { font-size: 20px; color: #1a1a1a; margin-bottom: 8px; }
-    p { font-size: 14px; color: #666; line-height: 1.5; margin-bottom: 20px; }
-    .btn {
-      background: #1976D2;
-      color: #ffffff;
+    .metric-item { display: flex; flex-direction: column; align-items: center; }
+    .metric-item .title { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+    .metric-item .val { font-size: 26px; font-weight: 800; color: var(--primary); margin: 2px 0; }
+    .metric-item .unit { font-size: 10px; color: var(--text-muted); }
+    .aqi-pill {
+      background: #E8F5E9;
+      color: #2E7D32;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    /* Standard Infinite Carousel */
+    .carousel-container {
+      position: relative;
+      background: var(--card-bg);
+      border-radius: 20px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+      overflow: hidden;
+      touch-action: pan-y;
+      user-select: none;
+    }
+
+    .carousel-track {
+      display: flex;
+      transition: transform 0.4s ease-out;
+      width: 100%;
+    }
+
+    .carousel-slide {
+      min-width: 100%;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .slide-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .slide-title { font-size: 15px; font-weight: 700; color: var(--text-main); }
+    .swipe-hint { font-size: 11px; color: var(--text-muted); }
+
+    .chart-wrapper { position: relative; height: 210px; width: 100%; }
+
+    /* Form inside Slide */
+    .form-wrapper {
+      text-align: center;
+      max-width: 360px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    .form-wrapper p { font-size: 13px; color: var(--text-muted); margin-bottom: 14px; }
+    .email-input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1.5px solid #E2E8F0;
+      font-size: 14px;
+      margin-bottom: 10px;
+      outline: none;
+    }
+    .email-input:focus { border-color: var(--primary); }
+    .btn-sub {
+      background: var(--primary);
+      color: white;
       border: none;
-      padding: 14px 20px;
-      font-size: 15px;
-      font-weight: 600;
+      padding: 12px 18px;
+      font-size: 14px;
+      font-weight: 700;
       border-radius: 10px;
       cursor: pointer;
       width: 100%;
-      transition: background 0.2s;
     }
-    .btn:disabled { background: #9e9e9e; cursor: not-allowed; }
-    .btn:hover:not(:disabled) { background: #1565C0; }
-    #status-msg {
-      margin-top: 14px;
-      font-size: 13px;
-      font-weight: 500;
-    }
-    .success { color: #2e7d32; }
-    .error { color: #d32f2f; }
-  </style>
+    .btn-sub:disabled { background: #CBD5E1; }
 
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
+    /* Navigation Dots */
+    .carousel-footer {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 6px;
+      padding-bottom: 16px;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #CBD5E1;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .dot.active {
+      width: 22px;
+      border-radius: 4px;
+      background: var(--primary);
+    }
+
+    #status-msg { margin-top: 10px; font-size: 12px; font-weight: 600; }
+    .success { color: #16A34A; }
+    .error { color: #DC2626; }
+  </style>
 </head>
 <body>
 
-  <div class="card">
-    <div class="icon">🌿</div>
-    <h1>รายงานสภาพอากาศ ม.มหิดล</h1>
-    <p>กดปุ่มด้านล่างเพื่อรับการแจ้งเตือนค่าฝุ่น PM2.5 และ AQI ประจำวันเด้งเข้าหน้าจอมือถืออัตโนมัติ</p>
-    <button class="btn" id="subscribeBtn">🔔 เปิดรับการแจ้งเตือน</button>
-    <div id="status-msg"></div>
+  <div class="container">
+    
+    <!-- Title Card -->
+    <div class="header-card">
+      <h1>🌿 Mahidol Air Quality Index</h1>
+      <p>ระบบตรวจวัดคุณภาพอากาศ มหาวิทยาลัยมหิดล ศาลายา</p>
+    </div>
+
+    <!-- Real-time Status Card -->
+    <div class="hero-card">
+      <div class="metric-item">
+        <span class="title">AQI ปัจจุบัน</span>
+        <span class="val" id="valAqi">--</span>
+        <div class="aqi-pill" id="lblStatus">อากาศดีมาก</div>
+      </div>
+      <div class="metric-item">
+        <span class="title">PM2.5</span>
+        <span class="val" id="valPm25">--</span>
+        <span class="unit">µg/m³</span>
+      </div>
+      <div class="metric-item">
+        <span class="title">PM10</span>
+        <span class="val" id="valPm10">--</span>
+        <span class="unit">µg/m³</span>
+      </div>
+    </div>
+
+    <!-- Infinite Carousel Section -->
+    <div class="carousel-container" id="carouselContainer">
+      <div class="carousel-track" id="carouselTrack">
+        
+        <!-- Slide 1: กราฟแนวโน้ม 24 ชั่วโมง -->
+        <div class="carousel-slide" id="slide1">
+          <div class="slide-header">
+            <span class="slide-title">📈 แนวโน้มคุณภาพอากาศย้อนหลัง 24 ชม.</span>
+            <span class="swipe-hint">ปัดขวาเพื่อรับแจ้งเตือน ➔</span>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="aqiChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Slide 2: ฟอร์มสมัครรับการแจ้งเตือน -->
+        <div class="carousel-slide" id="slide2">
+          <div class="slide-header">
+            <span class="slide-title">🔔 รับการแจ้งเตือนฝุ่นรายวัน</span>
+            <span class="swipe-hint">ปัดเพื่อดูกราฟ ➔</span>
+          </div>
+          <div class="form-wrapper">
+            <p>รับการแจ้งเตือนค่าฝุ่น PM2.5 และ AQI เด้งเข้าหน้าจออัตโนมัติทุกเช้า</p>
+            <form id="subscribeForm" onsubmit="return false;">
+              <input type="email" id="userEmail" class="email-input" placeholder="กรอกอีเมลของคุณ (เช่น user@mahidol.edu)" required>
+              <button type="submit" class="btn-sub" id="subscribeBtn">เปิดรับการแจ้งเตือน</button>
+            </form>
+            <div id="status-msg"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Indicator Dots -->
+      <div class="carousel-footer">
+        <div class="dot active" data-index="0"></div>
+        <div class="dot" data-index="1"></div>
+      </div>
+    </div>
+
   </div>
 
   <script>
+    // ----------------- Carousel Controller (Infinite Swipe) -----------------
+    const track = document.getElementById('carouselTrack');
+    const container = document.getElementById('carouselContainer');
+    const dots = document.querySelectorAll('.dot');
+    let currentIndex = 0;
+    const totalSlides = 2;
+
+    function updateCarousel(index, smooth = true) {
+      track.style.transition = smooth ? 'transform 0.35s ease-out' : 'none';
+      currentIndex = (index + totalSlides) % totalSlides;
+      track.style.transform = `translateX(-${currentIndex * 100}%)`;
+      
+      dots.forEach((dot, i) => {
+        dot.classList.toggle('active', i === currentIndex);
+      });
+    }
+
+    dots.forEach((dot, i) => {
+      dot.addEventListener('click', () => updateCarousel(i));
+    });
+
+    // Touch & Drag Gesture Handling
+    let startX = 0;
+    let currentTranslate = 0;
+    let isDragging = false;
+
+    container.addEventListener('touchstart', (e) => {
+      startX = e.touches[0].clientX;
+      isDragging = true;
+    }, { passive: true });
+
+    container.addEventListener('touchmove', (e) => {
+      if (!isDragging) return;
+      const moveX = e.touches[0].clientX;
+      const diff = moveX - startX;
+      currentTranslate = -(currentIndex * container.offsetWidth) + diff;
+      track.style.transition = 'none';
+      track.style.transform = `translateX(${currentTranslate}px)`;
+    }, { passive: true });
+
+    container.addEventListener('touchend', (e) => {
+      if (!isDragging) return;
+      isDragging = false;
+      const endX = e.changedTouches[0].clientX;
+      const diff = endX - startX;
+
+      if (Math.abs(diff) > 50) {
+        if (diff > 0) {
+          updateCarousel(currentIndex - 1); // ปัดขวา (ย้อนกลับ/วนลูป)
+        } else {
+          updateCarousel(currentIndex + 1); // ปัดซ้าย (ไปข้างหน้า/วนลูป)
+        }
+      } else {
+        updateCarousel(currentIndex); // เด้งกลับตำแหน่งเดิม
+      }
+    });
+
+    // ----------------- Firebase & Push Registration -----------------
     const firebaseConfig = {
       apiKey: "AIzaSyBYh9A6rnlE-fk59R__ZxZT6AMfMwreIJc",
       authDomain: "pwa-aqi-alert.firebaseapp.com",
       projectId: "pwa-aqi-alert",
       storageBucket: "pwa-aqi-alert.firebasestorage.app",
-      messagingSenderId: "351293220998", // แก้ไขเป็น Sender ID ตัวเลขจริง
+      messagingSenderId: "351293220998",
       appId: "1:351293220998:web:631e82ed1049c986d60907"
     };
-
-    // ปิดเครื่องหมายคำพูดเรียบร้อย
     const VAPID_KEY = "BOnPd9wbT5Qnh3NvqkIv4r1NXQhbTFPE8JKejT1Hwv3j7s0rzEwGiigr5BtopQ_aNcP77NTQmmv6C-5oZddc3fc";
-
-    // แทนที่ด้วย URL จากการ Deploy Web App ใน Google Apps Script
     const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwtB68XYpPMRVRDBi2rlLtLOSE0lPogt6GqPKfRidQtYi_vHKWjuqrs49_6iXR0p2xUNQ/exec";
 
     firebase.initializeApp(firebaseConfig);
     const messaging = firebase.messaging();
 
+    const subscribeForm = document.getElementById('subscribeForm');
     const subscribeBtn = document.getElementById('subscribeBtn');
     const statusMsg = document.getElementById('status-msg');
+    const userEmailInput = document.getElementById('userEmail');
 
-    subscribeBtn.addEventListener('click', async () => {
+    subscribeForm.addEventListener('submit', async () => {
+      const email = userEmailInput.value.trim();
+      if (!email) return;
+
       subscribeBtn.disabled = true;
       statusMsg.className = '';
-      statusMsg.textContent = 'กำลังดำเนินการ...';
+      statusMsg.textContent = 'กำลังลงทะเบียน...';
 
       try {
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') {
           statusMsg.className = 'error';
-          statusMsg.textContent = 'กรุณาอนุญาตสิทธิ์การแจ้งเตือนในเบราว์เซอร์';
+          statusMsg.textContent = 'กรุณาเปิดสิทธิ์แจ้งเตือนในระบบของอุปกรณ์';
           subscribeBtn.disabled = false;
           return;
         }
 
-        const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js', {
-            scope: './'});
+        const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js', { scope: './' });
+        await navigator.serviceWorker.ready;
 
         const currentToken = await messaging.getToken({
           vapidKey: VAPID_KEY,
@@ -115,23 +355,70 @@
             method: 'POST',
             mode: 'no-cors',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: currentToken })
+            body: JSON.stringify({ token: currentToken, email: email })
           });
 
           statusMsg.className = 'success';
-          statusMsg.textContent = '✅ ลงทะเบียนรับการแจ้งเตือนสำเร็จ!';
-          subscribeBtn.textContent = 'เปิดการแจ้งเตือนแล้ว';
-        } else {
-          throw new Error('ไม่สามารถสร้าง Registration Token ได้');
+          statusMsg.textContent = '✅ ลงทะเบียนสำเร็จ!';
+          subscribeBtn.textContent = 'เปิดแจ้งเตือนแล้ว';
+          userEmailInput.disabled = true;
         }
-
-      } catch (error) {
-        console.error('Registration Error:', error);
+      } catch (err) {
         statusMsg.className = 'error';
-        statusMsg.textContent = 'เกิดข้อผิดพลาดในการลงทะเบียน กรุณาลองใหม่อีกครั้ง';
+        statusMsg.textContent = 'ข้อผิดพลาด: ' + err.message;
         subscribeBtn.disabled = false;
       }
     });
+
+    // ----------------- Render Chart & Data -----------------
+    function initAirDashboard() {
+      const sampleData = [
+        { time: '00:00', aqi: 32, pm25: 14 },
+        { time: '04:00', aqi: 38, pm25: 16 },
+        { time: '08:00', aqi: 52, pm25: 22 },
+        { time: '12:00', aqi: 45, pm25: 19 },
+        { time: '16:00', aqi: 39, pm25: 17 },
+        { time: '20:00', aqi: 40, pm25: 18 }
+      ];
+
+      document.getElementById('valAqi').textContent = sampleData[sampleData.length - 1].aqi;
+      document.getElementById('valPm25').textContent = sampleData[sampleData.length - 1].pm25;
+      document.getElementById('valPm10').textContent = "32";
+
+      const ctx = document.getElementById('aqiChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: sampleData.map(d => d.time),
+          datasets: [
+            {
+              label: 'AQI',
+              data: sampleData.map(d => d.aqi),
+              borderColor: '#0288D1',
+              backgroundColor: 'rgba(2, 136, 209, 0.08)',
+              fill: true,
+              tension: 0.3
+            },
+            {
+              label: 'PM2.5',
+              data: sampleData.map(d => d.pm25),
+              borderColor: '#FFA000',
+              borderDash: [4, 4],
+              fill: false,
+              tension: 0.3
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom' } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    }
+
+    initAirDashboard();
   </script>
 </body>
 </html>
