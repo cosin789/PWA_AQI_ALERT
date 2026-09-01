@@ -254,6 +254,101 @@
     const dots = document.querySelectorAll('.dot');
     let currentIndex = 0;
     const totalSlides = 2;
+//===============================================
+    async function loadAirData() {
+      const APM_URL = "https://mahidol.ac.th/aqireport/data/APM.json";
+
+      try {
+        const res = await fetch(APM_URL);
+        const data = await res.json();
+
+        if (!data || data.length === 0) return;
+
+        // ดึงข้อมูล 24 แถวล่าสุด (ย้อนหลัง 24 ชม.)
+        const recentData = data.slice(-24);
+        const latest = recentData[recentData.length - 1];
+
+        const aqiVal = Math.round(Number(latest.AQI));
+        const pm25Val = Number(latest.PM_25).toFixed(1);
+        const pm10Val = Number(latest.PM_10).toFixed(1);
+
+        document.getElementById('valAqi').textContent = aqiVal;
+        document.getElementById('valPm25').textContent = pm25Val;
+        document.getElementById('valPm10').textContent = pm10Val;
+
+        // อัปเดตสีและข้อความตามเกณฑ์
+        const aqiPill = document.getElementById('lblStatus');
+        if (aqiVal <= 25) {
+          aqiPill.textContent = "อากาศดีมาก";
+          aqiPill.style.background = "#E8F5E9";
+          aqiPill.style.color = "#2E7D32";
+        } else if (aqiVal <= 50) {
+          aqiPill.textContent = "อากาศดี";
+          aqiPill.style.background = "#E8F5E9";
+          aqiPill.style.color = "#2E7D32";
+        } else if (aqiVal <= 100) {
+          aqiPill.textContent = "ปานกลาง";
+          aqiPill.style.background = "#FFFDE7";
+          aqiPill.style.color = "#F57F17";
+        } else if (aqiVal <= 200) {
+          aqiPill.textContent = "เริ่มมีผลกระทบ";
+          aqiPill.style.background = "#FFF3E0";
+          aqiPill.style.color = "#E65100";
+        } else {
+          aqiPill.textContent = "มีผลกระทบต่อสุขภาพ";
+          aqiPill.style.background = "#FFEBEE";
+          aqiPill.style.color = "#C62828";
+        }
+
+        // วาดกราฟ 24 ชม.
+        renderAqiChart(recentData);
+
+      } catch (error) {
+        console.error("ดึงข้อมูล APM.json ล้มเหลว:", error);
+      }
+    }
+
+    function renderAqiChart(historyData) {
+      const labels = historyData.map(item => {
+        const timePart = item.Date_Time_AQI ? item.Date_Time_AQI.split(' ')[1] || '' : '';
+        return timePart.substring(0, 5); // เช่น "08:00"
+      });
+
+      const aqiPoints = historyData.map(item => Number(item.AQI));
+      const pm25Points = historyData.map(item => Number(item.PM_25));
+
+      const ctx = document.getElementById('aqiChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'AQI',
+              data: aqiPoints,
+              borderColor: '#0288D1',
+              backgroundColor: 'rgba(2, 136, 209, 0.08)',
+              fill: true,
+              tension: 0.3
+            },
+            {
+              label: 'PM2.5 (µg/m³)',
+              data: pm25Points,
+              borderColor: '#FFA000',
+              borderDash: [4, 4],
+              fill: false,
+              tension: 0.3
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom' } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    }
 // ฟังก์ชันล้างและลงทะเบียนใหม่แบบอัตโนมัติ
     async function fixAndResubscribe() {
       statusMsg.className = '';
@@ -358,7 +453,7 @@
       appId: "1:351293220998:web:631e82ed1049c986d60907"
     };
     const VAPID_KEY = "BOnPd9wbT5Qnh3NvqkIv4r1NXQhbTFPE8JKejT1Hwv3j7s0rzEwGiigr5BtopQ_aNcP77NTQmmv6C-5oZddc3fc";
-    const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxtYLx4Wj2DTywk9cFqKJjF1uEPPWl1BFO_UTABhJAxO2H7RwQEdYwZdM1KOy0BHyuXRg/exec";
+    const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyNXY13T4QBYqKjQlEeB4KUdgvlNxEzxPL7GZuc2xf_IeTUMpJX0XI7KLivNfrWkCM_/exec";
 
     firebase.initializeApp(firebaseConfig);
     const messaging = firebase.messaging();
